@@ -8,6 +8,7 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 
+import { AuthProvider } from "@/features/auth/context/AuthProvider";
 import appCss from "../styles.css?url";
 
 function NotFoundComponent() {
@@ -73,17 +74,37 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Lovable App" },
-      { name: "description", content: "CyberCode Arena is a futuristic AI-powered platform for real-time collaborative competitive programming." },
+      {
+        name: "description",
+        content:
+          "CyberCode Arena is a futuristic AI-powered platform for real-time collaborative competitive programming.",
+      },
       { name: "author", content: "Lovable" },
       { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "CyberCode Arena is a futuristic AI-powered platform for real-time collaborative competitive programming." },
+      {
+        property: "og:description",
+        content:
+          "CyberCode Arena is a futuristic AI-powered platform for real-time collaborative competitive programming.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
       { name: "twitter:title", content: "Lovable App" },
-      { name: "twitter:description", content: "CyberCode Arena is a futuristic AI-powered platform for real-time collaborative competitive programming." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/795d9247-13bb-41ae-a6ae-6c824eda25a0/id-preview-254260f4--355f1a2a-1483-432b-bab6-f9e629ea0b7f.lovable.app-1778691483924.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/795d9247-13bb-41ae-a6ae-6c824eda25a0/id-preview-254260f4--355f1a2a-1483-432b-bab6-f9e629ea0b7f.lovable.app-1778691483924.png" },
+      {
+        name: "twitter:description",
+        content:
+          "CyberCode Arena is a futuristic AI-powered platform for real-time collaborative competitive programming.",
+      },
+      {
+        property: "og:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/795d9247-13bb-41ae-a6ae-6c824eda25a0/id-preview-254260f4--355f1a2a-1483-432b-bab6-f9e629ea0b7f.lovable.app-1778691483924.png",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/795d9247-13bb-41ae-a6ae-6c824eda25a0/id-preview-254260f4--355f1a2a-1483-432b-bab6-f9e629ea0b7f.lovable.app-1778691483924.png",
+      },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
@@ -120,7 +141,9 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <Outlet />
+      <AuthProvider>
+        <Outlet />
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

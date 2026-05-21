@@ -190,4 +190,41 @@
     100% { background-position: 56px 56px; }
   }
   .animated-grid { animation: grid-move 18s linear infinite; }
+
+  /* Semantic neon / surface tokens (same OKLCH as inline usages) */
+  .text-neon-cyan { color: var(--neon-cyan); }
+  .bg-neon-cyan { background-color: var(--neon-cyan); }
+  .text-neon-purple { color: var(--neon-purple); }
+  .text-neon-pink { color: var(--neon-pink); }
+  .text-neon-blue { color: var(--neon-blue); }
+  .text-neon-yellow { color: oklch(0.78 0.18 85); }
+  .text-neon-gold { color: oklch(0.78 0.2 90); }
+  .text-syntax-purple { color: oklch(0.7 0.22 285); }
+  .text-syntax-yellow { color: oklch(0.78 0.18 85); }
+  .text-status-live { color: oklch(0.85 0.2 150); }
+  .text-status-success { color: oklch(0.85 0.2 150); }
+  .text-status-danger { color: oklch(0.7 0.2 25); }
+  .text-link-accent { color: var(--neon-cyan); }
+
+  .bg-neon-cyan-soft { background-color: oklch(0.85 0.18 200 / 0.1); }
+  .bg-neon-cyan-muted { background-color: oklch(0.85 0.18 200 / 0.2); }
+  .border-neon-cyan-soft { border-color: oklch(0.85 0.18 200 / 0.3); }
+  .bg-neon-purple-soft { background-color: oklch(0.7 0.22 285 / 0.1); }
+  .bg-neon-purple-muted { background-color: oklch(0.7 0.22 285 / 0.15); }
+  .bg-neon-purple-badge { background-color: oklch(0.7 0.22 285 / 0.2); }
+  .border-neon-purple-soft { border-color: oklch(0.7 0.22 285 / 0.3); }
+  .border-neon-purple-strong { border-color: oklch(0.7 0.22 285 / 0.4); }
+  .border-neon-purple-ring { border-color: oklch(0.7 0.22 285 / 0.5); }
+  .ring-neon-purple-featured { --tw-ring-color: oklch(0.7 0.22 285 / 0.6); }
+  .bg-status-live-soft { background-color: oklch(0.7 0.18 150 / 0.2); }
+  .bg-status-live-btn { background-color: oklch(0.7 0.18 150 / 0.2); }
+  .bg-status-success-ping { background-color: oklch(0.7 0.18 150); }
+  .bg-surface-editor { background-color: oklch(0.1 0.02 270); }
+  .bg-surface-input { background-color: oklch(0.13 0.02 270); }
+  .bg-surface-track { background-color: oklch(0.2 0.03 270); }
+  .bg-syntax-marker { background-color: oklch(0.7 0.22 285 / 0.25); }
+  .bg-traffic-red { background-color: oklch(0.65 0.25 25); }
+  .bg-traffic-yellow { background-color: oklch(0.78 0.18 85); }
+  .bg-traffic-green { background-color: oklch(0.7 0.18 150); }
+  .fill-neon-cyan { fill: var(--neon-cyan); }
 }
