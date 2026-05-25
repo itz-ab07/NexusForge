@@ -6,93 +6,181 @@ import { SquadPanel } from "./SquadPanel";
 import { TeamChatPanel } from "./TeamChatPanel";
 import { io } from "socket.io-client";
 import { useState, useRef, useEffect } from "react";
+import { useAuth } from "@/features/auth/context/AuthProvider";
+
 export function RoomPage() {
-  const [message, setMessage] = useState("");
-  const [messages, setMessages] = useState<string[]>([]);
+  const { user } = useAuth();
   const [output, setOutput] = useState("Click Run to execute code...");
   const [loading, setLoading] = useState(false);
-  const [code, setCode] = useState("// start coding here");
+  const [code, setCode] = useState("// start coding here\n");
   const [language, setLanguage] = useState("cpp");
   const [input, setInput] = useState("");
   const [roomId, setRoomId] = useState("");
   const [joined, setJoined] = useState(false);
+  const [onlineUsers, setOnlineUsers] = useState<any[]>([]);
+  const [myInfo, setMyInfo] = useState<any>(null);
+  const [messages, setMessages] = useState<any[]>([]);
+  
   const isRemoteChange = useRef(false);
-
-  const handleCodeChange = (newCode: string) => {
-  setCode(newCode);
-
-  if (isRemoteChange.current) {
-    isRemoteChange.current = false;
-    return;
-  }
-
-  if (joined && roomId) {
-    socketRef.current.emit("code-change", {
-      roomId,
-      code: newCode,
-    });
-  }
-};
-
   const socketRef = useRef<any>(null);
 
-useEffect(() => {
-  socketRef.current = io("http://localhost:5000");
+  // Initialize socket connection
+  useEffect(() => {
+    socketRef.current = io("http://localhost:5000");
 
-  socketRef.current.on("receive-code", (newCode: string) => {
-    isRemoteChange.current = true;
+    // Handle code synchronization from remote users
+    socketRef.current.on("receive-code", ({ code: newCode, language: newLang }: { code: string; language?: string }) => {
+      isRemoteChange.current = true;
+      setCode(newCode);
+      if (newLang) {
+        setLanguage(newLang);
+      }
+    });
+
+    // Handle initial room state synchronization
+    socketRef.current.on("room-init", ({ code: initCode, language: initLang, users, yourInfo }: any) => {
+      isRemoteChange.current = true;
+      setCode(initCode);
+      setLanguage(initLang);
+      setOnlineUsers(users);
+      setMyInfo(yourInfo);
+    });
+
+    // Handle user list updates
+    socketRef.current.on("room-users", (users: any[]) => {
+      setOnlineUsers(users);
+      // Keep myInfo updated with changes from backend (e.g. color, status, mic, video)
+      const me = users.find((u) => u.socketId === socketRef.current?.id);
+      if (me) {
+        setMyInfo(me);
+      }
+    });
+
+    // Handle team chat updates
+    socketRef.current.on("receive-message", (msg: { who: string; txt: string; c: string }) => {
+      setMessages((prev) => [...prev, msg]);
+    });
+
+    // Parse URL parameter "?id=roomId" on mount to auto-join
+    const params = new URLSearchParams(window.location.search);
+    const urlRoomId = params.get("id");
+    if (urlRoomId) {
+      setRoomId(urlRoomId);
+      // Wait for socket to establish connection before joining
+      const joinOnConnect = () => {
+        socketRef.current.emit("join-room", { roomId: urlRoomId, user });
+        setJoined(true);
+        socketRef.current.off("connect", joinOnConnect);
+      };
+      if (socketRef.current.connected) {
+        joinOnConnect();
+      } else {
+        socketRef.current.on("connect", joinOnConnect);
+      }
+    }
+
+    return () => {
+      socketRef.current?.disconnect();
+    };
+  }, [user]);
+
+  // Code editor updates
+  const handleCodeChange = (newCode: string) => {
     setCode(newCode);
-  });
 
-  return () => {
-    socketRef.current?.disconnect();
+    if (isRemoteChange.current) {
+      isRemoteChange.current = false;
+      return;
+    }
+
+    if (joined && roomId) {
+      socketRef.current.emit("code-change", {
+        roomId,
+        code: newCode,
+        language,
+      });
+    }
   };
-}, []);
 
-const joinRoom = () => {
-  if (!roomId) return;
-
-  socketRef.current.emit("join-room", roomId);
-  setJoined(true);
-};
-
-const sendMessage = () => {
-  if (!roomId || !message) return;
-
-  socketRef.current.emit("send-message", {
-    roomId,
-    message,
-  });
-
-  setMessages((prev) => [...prev, "You: " + message]);
-  setMessage("");
-};
-
-useEffect(() => {
-  socketRef.current.on("receive-message", (msg: string) => {
-    setMessages((prev) => [...prev, "Other: " + msg]);
-  });
-
-  return () => {
-    socketRef.current.off("receive-message");
+  // Language switcher updates
+  const handleLanguageChange = (newLang: string) => {
+    setLanguage(newLang);
+    if (joined && roomId) {
+      socketRef.current.emit("code-change", {
+        roomId,
+        code,
+        language: newLang,
+      });
+    }
   };
-}, []);
+
+  // Join room manually
+  const joinRoom = () => {
+    if (!roomId) return;
+    socketRef.current.emit("join-room", { roomId, user });
+    setJoined(true);
+
+    // Update URL query parameter without reloading the page
+    const newUrl = `${window.location.pathname}?id=${encodeURIComponent(roomId)}`;
+    window.history.pushState({ path: newUrl }, "", newUrl);
+  };
+
+  // Send message
+  const handleSendMessage = (msgText: string) => {
+    if (!roomId || !msgText.trim()) return;
+
+    socketRef.current.emit("send-message", {
+      roomId,
+      message: msgText,
+    });
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        who: "You",
+        txt: msgText,
+        c: myInfo?.color || "oklch(0.78 0.2 90)",
+      },
+    ]);
+  };
+
+  // Handle local microphone toggle
+  const handleMicToggle = (micState: boolean) => {
+    if (joined && roomId) {
+      socketRef.current.emit("mic-toggle", { roomId, mic: micState });
+    }
+  };
+
+  // Handle local video toggle
+  const handleVideoToggle = (videoState: boolean) => {
+    if (joined && roomId) {
+      socketRef.current.emit("video-toggle", { roomId, video: videoState });
+    }
+  };
 
   return (
     <div className="flex flex-col min-h-screen">
       <RoomHeader
         code={code}
         input={input}
+        roomId={roomId}
+        joined={joined}
         setOutput={setOutput}
         setLoading={setLoading}
       />
       <div className="flex-1 grid grid-cols-12 gap-3 p-3 min-h-0">
-        <SquadPanel />
+        <SquadPanel
+          users={onlineUsers}
+          myInfo={myInfo}
+          onMicToggle={handleMicToggle}
+          onVideoToggle={handleVideoToggle}
+        />
+        
         <main className="col-span-12 md:col-span-7 flex flex-col gap-3 min-w-0">
           <ProblemPanel />
+          
           <div className="holo-card p-3">
-          <div className="text-sm text-neon-cyan mb-2">Custom Input</div>
-
+            <div className="text-sm text-neon-cyan mb-2">Custom Input</div>
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -102,33 +190,50 @@ useEffect(() => {
           </div>
 
           <div className="flex items-center justify-between">
-            <select
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-              className="bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
-            >
-              <option value="cpp">C++</option>
-              <option value="python">Python</option>
-            </select>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Language:</span>
+              <select
+                value={language}
+                onChange={(e) => handleLanguageChange(e.target.value)}
+                className="bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white cursor-pointer outline-none"
+              >
+                <option value="cpp">C++</option>
+                <option value="python">Python</option>
+              </select>
+            </div>
+            
+            {!joined && (
+              <div className="flex gap-2 items-center">
+                <input
+                  placeholder="Enter Room ID"
+                  value={roomId}
+                  onChange={(e) => setRoomId(e.target.value)}
+                  className="bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white outline-none"
+                />
+                <button
+                  onClick={joinRoom}
+                  className="bg-gradient-primary px-4 py-1.5 text-xs font-semibold text-white rounded-lg hover:opacity-90 transition glow-purple"
+                >
+                  Join Room
+                </button>
+              </div>
+            )}
+            
+            {joined && (
+              <div className="text-xs text-status-success flex items-center gap-1.5">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-status-success-ping opacity-75" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success-ping" />
+                </span>
+                Connected to room: <span className="font-mono text-neon-cyan font-semibold">{roomId}</span>
+              </div>
+            )}
           </div>
 
-          <div className="flex gap-2 mb-2">
-  <input
-    placeholder="Room ID"
-    value={roomId}
-    onChange={(e) => setRoomId(e.target.value)}
-    className="border px-2 py-1"
-  />
-
-  <button onClick={joinRoom} className="bg-green-500 px-3 py-1">
-    Join
-  </button>
-</div>
-
           <CodeEditorPanel code={code} setCode={handleCodeChange} />
+          
           <div className="holo-card p-3 text-xs font-mono text-white bg-black/40 border border-white/10">
             <div className="text-neon-cyan mb-2">Output</div>
-
             {loading ? (
               <div className="text-yellow-400">Running code...</div>
             ) : (
@@ -136,31 +241,10 @@ useEffect(() => {
             )}
           </div>
         </main>
+        
         <aside className="col-span-12 md:col-span-3 flex flex-col gap-3 min-h-0">
-          <div className="holo-card p-3 mt-2">
-  <div className="text-neon-cyan mb-2">Team Chat</div>
-
-  <div className="h-40 overflow-auto text-sm mb-2">
-    {messages.map((m, i) => (
-      <div key={i}>{m}</div>
-    ))}
-  </div>
-
-  <div className="flex gap-2">
-    <input
-      value={message}
-      onChange={(e) => setMessage(e.target.value)}
-      placeholder="Type message..."
-      className="flex-1 px-2 py-1 border"
-    />
-
-    <button onClick={sendMessage} className="bg-blue-500 px-3">
-      Send
-    </button>
-  </div>
-</div>
           <CopilotPanel />
-          <TeamChatPanel />
+          <TeamChatPanel messages={messages} onSendMessage={handleSendMessage} />
         </aside>
       </div>
     </div>
