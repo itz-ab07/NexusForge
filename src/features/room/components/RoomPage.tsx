@@ -6,11 +6,9 @@ import { SquadPanel } from "./SquadPanel";
 import { TeamChatPanel } from "./TeamChatPanel";
 import { io } from "socket.io-client";
 import { useState, useRef, useEffect } from "react";
-const [message, setMessage] = useState("");
-const [messages, setMessages] = useState<string[]>([]);
-
-
 export function RoomPage() {
+  const [message, setMessage] = useState("");
+  const [messages, setMessages] = useState<string[]>([]);
   const [output, setOutput] = useState("Click Run to execute code...");
   const [loading, setLoading] = useState(false);
   const [code, setCode] = useState("// start coding here");
