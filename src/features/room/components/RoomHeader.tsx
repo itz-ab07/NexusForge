@@ -1,7 +1,42 @@
 import { Link } from "@tanstack/react-router";
 import { ChevronLeft, Circle, Hash, Play, Settings } from "lucide-react";
+import { useState } from "react";
+import axios from "axios";
 
-export function RoomHeader() {
+export function RoomHeader({
+  code,
+  input,
+  setOutput,
+  setLoading,
+}: {
+  code: string;
+  input: string;
+  setOutput: (v: string) => void;
+  setLoading: (v: boolean) => void;
+}) {
+  const handleRun = async () => {
+  try {
+    setLoading(true);
+
+    const res = await fetch("http://localhost:5000/run", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        code,
+        input,
+      }),
+    });
+
+    const data = await res.json();
+    setOutput(data.output);
+  } catch (err) {
+    setOutput("Execution failed ❌");
+  } finally {
+    setLoading(false);
+  }
+};
   return (
     <header className="glass-strong border-b border-border/50 px-4 py-3 flex items-center justify-between">
       <div className="flex items-center gap-3">
@@ -26,6 +61,7 @@ export function RoomHeader() {
         </div>
         <button
           type="button"
+          onClick={handleRun}
           className="inline-flex items-center gap-2 rounded-xl bg-gradient-primary px-4 py-2 text-sm font-medium glow-purple hover:opacity-90 transition"
         >
           <Play className="h-3.5 w-3.5" /> Run

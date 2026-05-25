@@ -1,4 +1,5 @@
 import { FileCode } from "lucide-react";
+import Editor from "@monaco-editor/react";
 import {
   roomCodeLines,
   roomColorMap,
@@ -6,7 +7,13 @@ import {
   roomMembers,
 } from "@/features/room/data/room.mock";
 
-export function CodeEditorPanel() {
+export function CodeEditorPanel({
+  code,
+  setCode,
+}: {
+  code: string;
+  setCode: (value: string) => void;
+}) {
   return (
     <div className="holo-card flex-1 flex flex-col overflow-hidden glow-purple">
       <div className="flex items-center justify-between border-b border-border/50 px-4 py-2">
@@ -27,22 +34,34 @@ export function CodeEditorPanel() {
           ))}
         </div>
       </div>
-      <pre className="flex-1 overflow-auto bg-surface-editor p-4 font-mono text-xs leading-6 scrollbar-thin">
-        {roomCodeLines.map((l) => (
-          <div key={l.n} className="flex items-center group hover:bg-white/[0.02]">
-            <span className="select-none w-10 text-right pr-3 text-muted-foreground/50">{l.n}</span>
-            <span className={`flex-1 ${roomColorMap[l.c || ""] || ""}`}>{l.t || "\u00A0"}</span>
-            {l.marker && (
-              <span
-                className="ml-2 rounded px-1.5 text-[9px] font-bold text-white"
-                style={{ background: roomMarkerColor[l.marker] }}
-              >
-                {l.marker}
-              </span>
-            )}
-          </div>
-        ))}
-      </pre>
+
+          <div className="flex-1 min-h-0">
+  {/* <Editor
+    height="100%"
+    defaultLanguage="cpp"
+    defaultValue={code}
+    theme="vs-dark"
+    options={{
+      minimap: { enabled: false },
+      fontSize: 14,
+      fontFamily: "JetBrains Mono",
+      smoothScrolling: true,
+      padding: { top: 16 },
+      cursorBlinking: "smooth",
+      renderLineHighlight: "all",
+      scrollBeyondLastLine: false,
+      automaticLayout: true,
+    }}
+  /> */}
+  <Editor
+  height="100%"
+  language="cpp"
+  value={code}
+  onChange={(value) => setCode(value || "")}
+  theme="vs-dark"
+/>
+</div>
+
       <div className="border-t border-border/50 bg-surface-editor px-4 py-2 font-mono text-xs">
         <span className="text-muted-foreground">$ </span>
         <span className="text-status-success">Test 14/14 passed</span>
