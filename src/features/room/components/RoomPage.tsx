@@ -20,6 +20,7 @@ export function RoomPage() {
   const [onlineUsers, setOnlineUsers] = useState<any[]>([]);
   const [myInfo, setMyInfo] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
+  const [remoteCursors, setRemoteCursors] = useState<any[]>([]);
   
   const isRemoteChange = useRef(false);
   const socketRef = useRef<any>(null);
@@ -49,11 +50,21 @@ export function RoomPage() {
     // Handle user list updates
     socketRef.current.on("room-users", (users: any[]) => {
       setOnlineUsers(users);
-      // Keep myInfo updated with changes from backend (e.g. color, status, mic, video)
+      // Clean up remoteCursors of offline users
+      setRemoteCursors((prev) => prev.filter((rc) => users.some((u) => u.socketId === rc.socketId)));
+      
       const me = users.find((u) => u.socketId === socketRef.current?.id);
       if (me) {
         setMyInfo(me);
       }
+    });
+
+    // Handle cursor synchronization updates
+    socketRef.current.on("cursor-update", ({ socketId, cursor, username, color }: any) => {
+      setRemoteCursors((prev) => {
+        const filtered = prev.filter((c) => c.socketId !== socketId);
+        return [...filtered, { socketId, cursor, username, color }];
+      });
     });
 
     // Handle team chat updates
@@ -99,6 +110,13 @@ export function RoomPage() {
         code: newCode,
         language,
       });
+    }
+  };
+
+  // Live cursor updates
+  const handleCursorMove = (cursorPos: { line: number; column: number }) => {
+    if (joined && roomId) {
+      socketRef.current.emit("cursor-move", { roomId, cursor: cursorPos });
     }
   };
 
@@ -230,7 +248,13 @@ export function RoomPage() {
             )}
           </div>
 
-          <CodeEditorPanel code={code} setCode={handleCodeChange} />
+          <CodeEditorPanel
+            code={code}
+            setCode={handleCodeChange}
+            onCursorMove={handleCursorMove}
+            remoteCursors={remoteCursors}
+            mySocketId={socketRef.current?.id}
+          />
           
           <div className="holo-card p-3 text-xs font-mono text-white bg-black/40 border border-white/10">
             <div className="text-neon-cyan mb-2">Output</div>
