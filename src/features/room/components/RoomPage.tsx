@@ -251,6 +251,7 @@ export function RoomPage() {
           <CodeEditorPanel
             code={code}
             setCode={handleCodeChange}
+            language={language}
             onCursorMove={handleCursorMove}
             remoteCursors={remoteCursors}
             mySocketId={socketRef.current?.id}

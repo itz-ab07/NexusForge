@@ -5,12 +5,14 @@ import { useRef, useEffect } from "react";
 export function CodeEditorPanel({
   code,
   setCode,
+  language = "cpp",
   onCursorMove,
   remoteCursors = [],
   mySocketId,
 }: {
   code: string;
   setCode: (value: string) => void;
+  language?: string;
   onCursorMove?: (cursor: { line: number; column: number }) => void;
   remoteCursors?: any[];
   mySocketId?: string;
@@ -18,6 +20,34 @@ export function CodeEditorPanel({
   const editorRef = useRef<any>(null);
   const monacoRef = useRef<any>(null);
   const decorationsRef = useRef<string[]>([]);
+  
+  // Track last synced code to prevent feedback loops
+  const lastSyncedCode = useRef<string>(code);
+
+  // Uncontrolled sync effect: Apply remote updates smoothly without affecting user cursor
+  useEffect(() => {
+    if (!editorRef.current) return;
+
+    const currentVal = editorRef.current.getValue();
+    if (code !== currentVal && code !== lastSyncedCode.current) {
+      lastSyncedCode.current = code;
+
+      // Save editor state: cursor positions, selections, and scroll coordinates
+      const position = editorRef.current.getPosition();
+      const selections = editorRef.current.getSelections();
+      const scrollTop = editorRef.current.getScrollTop();
+      const scrollLeft = editorRef.current.getScrollLeft();
+
+      // Perform updates
+      editorRef.current.setValue(code);
+
+      // Restore editor state to completely eliminate cursor jumps and caret resetting!
+      if (position) editorRef.current.setPosition(position);
+      if (selections) editorRef.current.setSelections(selections);
+      editorRef.current.setScrollTop(scrollTop);
+      editorRef.current.setScrollLeft(scrollLeft);
+    }
+  }, [code]);
 
   // Update decorations when remote cursors change
   useEffect(() => {
@@ -122,19 +152,31 @@ export function CodeEditorPanel({
     });
   };
 
+  const handleEditorChange = (value: string | undefined) => {
+    const currentVal = value || "";
+    lastSyncedCode.current = currentVal;
+    setCode(currentVal);
+  };
+
+  const fileName = language === "python" ? "solution.py" : "solution.cpp";
+  const languageTag = language === "python" ? "· Python 3" : "· C++17";
+
   return (
-    <div className="holo-card flex-1 flex flex-col overflow-hidden glow-purple min-h-[300px]">
+    <div className="holo-card flex-1 flex flex-col overflow-hidden glow-purple min-h-[350px]">
       <div className="flex items-center justify-between border-b border-border/50 px-4 py-2 bg-surface-editor">
         <div className="flex items-center gap-2">
           <FileCode className="h-3.5 w-3.5 text-neon-cyan" />
-          <span className="font-mono text-xs">solution.cpp</span>
-          <span className="text-[10px] text-muted-foreground">· C++17</span>
+          <span className="font-mono text-xs">{fileName}</span>
+          <span className="text-[10px] text-muted-foreground">{languageTag}</span>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground pr-1">
+          {remoteCursors.length > 0 && (
+            <span className="mr-1.5 animate-pulse text-neon-cyan">remote coding...</span>
+          )}
           {remoteCursors.map((rc) => (
             <div
               key={rc.socketId}
-              className="grid h-5 w-5 place-items-center rounded-full text-[8px] font-bold text-white border border-card glow-cyan"
+              className="grid h-5 w-5 place-items-center rounded-full text-[8px] font-bold text-white border border-card glow-cyan transition-all"
               style={{ background: rc.color }}
               title={rc.username}
             >
@@ -147,9 +189,9 @@ export function CodeEditorPanel({
       <div className="flex-1 min-h-0">
         <Editor
           height="100%"
-          language="cpp"
-          value={code}
-          onChange={(value) => setCode(value || "")}
+          language={language === "python" ? "python" : "cpp"}
+          defaultValue={code}
+          onChange={handleEditorChange}
           onMount={handleEditorMount}
           theme="vs-dark"
           options={{
