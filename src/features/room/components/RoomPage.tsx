@@ -7,6 +7,7 @@ import { TeamChatPanel } from "./TeamChatPanel";
 import { io } from "socket.io-client";
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/features/auth/context/AuthProvider";
+import { BACKEND_URL } from "@/shared/constants/config";
 
 export function RoomPage() {
   const { user } = useAuth();
@@ -27,7 +28,7 @@ export function RoomPage() {
 
   // Initialize socket connection
   useEffect(() => {
-    socketRef.current = io("http://localhost:5000");
+    socketRef.current = io(BACKEND_URL);
 
     // Handle code synchronization from remote users
     socketRef.current.on("receive-code", ({ code: newCode, language: newLang }: { code: string; language?: string }) => {
@@ -230,9 +231,23 @@ export function RoomPage() {
                 />
                 <button
                   onClick={joinRoom}
-                  className="bg-gradient-primary px-4 py-1.5 text-xs font-semibold text-white rounded-lg hover:opacity-90 transition glow-purple"
+                  className="bg-gradient-primary px-4 py-1.5 text-xs font-semibold text-white rounded-lg hover:opacity-90 transition cursor-pointer glow-purple"
                 >
                   Join Room
+                </button>
+                <span className="text-muted-foreground text-xs font-mono">or</span>
+                <button
+                  onClick={() => {
+                    const newId = Math.random().toString(36).substring(2, 10);
+                    setRoomId(newId);
+                    socketRef.current.emit("join-room", { roomId: newId, user });
+                    setJoined(true);
+                    const newUrl = `${window.location.pathname}?id=${encodeURIComponent(newId)}`;
+                    window.history.pushState({ path: newUrl }, "", newUrl);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-neon-cyan/20 bg-neon-cyan-soft/10 px-3 py-1.5 text-xs font-semibold text-neon-cyan cursor-pointer transition hover:bg-neon-cyan-soft/20 glow-cyan"
+                >
+                  Create Session
                 </button>
               </div>
             )}

@@ -2,6 +2,8 @@ import { Link } from "@tanstack/react-router";
 import { ChevronLeft, Circle, Hash, Play, Settings, Share2, Copy } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { BACKEND_URL } from "@/shared/constants/config";
+
 
 export function RoomHeader({
   code,
@@ -24,7 +26,7 @@ export function RoomHeader({
     try {
       setLoading(true);
 
-      const res = await fetch("http://localhost:5000/run", {
+      const res = await fetch(`${BACKEND_URL}/run`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

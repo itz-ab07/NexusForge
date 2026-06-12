@@ -24,6 +24,7 @@ export function DashboardHeader() {
         </button>
         <Link
           to="/room"
+          search={{ id: Math.random().toString(36).substring(2, 10) }}
           className="inline-flex items-center gap-2 rounded-xl bg-gradient-primary px-4 py-2.5 text-sm font-medium glow-purple hover:opacity-90 transition"
         >
           <Plus className="h-4 w-4" /> New room
