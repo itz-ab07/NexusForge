@@ -172,7 +172,7 @@ app.post("/run", (req, res) => {
   fs.writeFileSync(filename, code);
 
 if (language === "python") {
-  exec(`python ${filename}`, { timeout: 2000 }, (runError, runStdout, runStderr) => {
+  const runProcess = exec(`python ${filename}`, { timeout: 2000 }, (runError, runStdout, runStderr) => {
     if (runError) {
       return res.json({
         output: runStderr || runError.message,
@@ -183,6 +183,11 @@ if (language === "python") {
       output: runStdout || "No output",
     });
   });
+
+  if (input) {
+    runProcess.stdin.write(input);
+  }
+  runProcess.stdin.end();
 
 } else {
   exec(`g++ ${filename} -o temp.exe`, (compileError, stdout, stderr) => {

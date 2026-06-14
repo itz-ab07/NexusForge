@@ -25,74 +25,101 @@ export function RoomPage() {
   
   const isRemoteChange = useRef(false);
   const socketRef = useRef<any>(null);
+  const joinedRef = useRef(false);
+  const roomIdRef = useRef("");
+  const userRef = useRef(user);
+
+  userRef.current = user;
+
+  const markJoined = (id: string) => {
+    roomIdRef.current = id;
+    joinedRef.current = true;
+    setRoomId(id);
+    setJoined(true);
+  };
+
+  const emitJoinRoom = (targetRoomId: string) => {
+    socketRef.current?.emit("join-room", {
+      roomId: targetRoomId,
+      user: userRef.current,
+    });
+  };
 
   // Initialize socket connection
   useEffect(() => {
-    socketRef.current = io(BACKEND_URL);
+    const socket = io(BACKEND_URL);
+    socketRef.current = socket;
+
+    const rejoinIfNeeded = () => {
+      if (joinedRef.current && roomIdRef.current) {
+        emitJoinRoom(roomIdRef.current);
+      }
+    };
 
     // Handle code synchronization from remote users
-    socketRef.current.on("receive-code", ({ code: newCode, language: newLang }: { code: string; language?: string }) => {
+    const onReceiveCode = ({ code: newCode, language: newLang }: { code: string; language?: string }) => {
       isRemoteChange.current = true;
       setCode(newCode);
       if (newLang) {
         setLanguage(newLang);
       }
-    });
+    };
 
     // Handle initial room state synchronization
-    socketRef.current.on("room-init", ({ code: initCode, language: initLang, users, yourInfo }: any) => {
+    const onRoomInit = ({ code: initCode, language: initLang, users, yourInfo }: any) => {
       isRemoteChange.current = true;
       setCode(initCode);
       setLanguage(initLang);
       setOnlineUsers(users);
       setMyInfo(yourInfo);
-    });
+    };
 
     // Handle user list updates
-    socketRef.current.on("room-users", (users: any[]) => {
+    const onRoomUsers = (users: any[]) => {
       setOnlineUsers(users);
-      // Clean up remoteCursors of offline users
       setRemoteCursors((prev) => prev.filter((rc) => users.some((u) => u.socketId === rc.socketId)));
-      
-      const me = users.find((u) => u.socketId === socketRef.current?.id);
+
+      const me = users.find((u) => u.socketId === socket.id);
       if (me) {
         setMyInfo(me);
       }
-    });
+    };
 
     // Handle cursor synchronization updates
-    socketRef.current.on("cursor-update", ({ socketId, cursor, username, color }: any) => {
+    const onCursorUpdate = ({ socketId, cursor, username, color }: any) => {
       setRemoteCursors((prev) => {
         const filtered = prev.filter((c) => c.socketId !== socketId);
         return [...filtered, { socketId, cursor, username, color }];
       });
-    });
+    };
 
     // Handle team chat updates
-    socketRef.current.on("receive-message", (msg: { who: string; txt: string; c: string }) => {
+    const onReceiveMessage = (msg: { who: string; txt: string; c: string }) => {
       setMessages((prev) => [...prev, msg]);
-    });
+    };
+
+    socket.on("connect", rejoinIfNeeded);
+    socket.on("receive-code", onReceiveCode);
+    socket.on("room-init", onRoomInit);
+    socket.on("room-users", onRoomUsers);
+    socket.on("cursor-update", onCursorUpdate);
+    socket.on("receive-message", onReceiveMessage);
 
     // Parse URL parameter "?id=roomId" on mount to auto-join
     const params = new URLSearchParams(window.location.search);
     const urlRoomId = params.get("id");
     if (urlRoomId) {
-      setRoomId(urlRoomId);
-      // Wait for socket to establish connection before joining
-      const joinOnConnect = () => {
-        socketRef.current.emit("join-room", { roomId: urlRoomId, user });
-        setJoined(true);
-        socketRef.current.off("connect", joinOnConnect);
-      };
-      if (socketRef.current.connected) {
-        joinOnConnect();
-      } else {
-        socketRef.current.on("connect", joinOnConnect);
-      }
+      markJoined(urlRoomId);
     }
 
     return () => {
-      socketRef.current?.disconnect();
+      socket.off("connect", rejoinIfNeeded);
+      socket.off("receive-code", onReceiveCode);
+      socket.off("room-init", onRoomInit);
+      socket.off("room-users", onRoomUsers);
+      socket.off("cursor-update", onCursorUpdate);
+      socket.off("receive-message", onReceiveMessage);
+      socket.disconnect();
     };
   }, [user]);
 
@@ -136,8 +163,8 @@ export function RoomPage() {
   // Join room manually
   const joinRoom = () => {
     if (!roomId) return;
-    socketRef.current.emit("join-room", { roomId, user });
-    setJoined(true);
+    markJoined(roomId);
+    emitJoinRoom(roomId);
 
     // Update URL query parameter without reloading the page
     const newUrl = `${window.location.pathname}?id=${encodeURIComponent(roomId)}`;
@@ -182,6 +209,7 @@ export function RoomPage() {
       <RoomHeader
         code={code}
         input={input}
+        language={language}
         roomId={roomId}
         joined={joined}
         setOutput={setOutput}
@@ -239,9 +267,8 @@ export function RoomPage() {
                 <button
                   onClick={() => {
                     const newId = Math.random().toString(36).substring(2, 10);
-                    setRoomId(newId);
-                    socketRef.current.emit("join-room", { roomId: newId, user });
-                    setJoined(true);
+                    markJoined(newId);
+                    emitJoinRoom(newId);
                     const newUrl = `${window.location.pathname}?id=${encodeURIComponent(newId)}`;
                     window.history.pushState({ path: newUrl }, "", newUrl);
                   }}

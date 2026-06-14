@@ -8,6 +8,7 @@ import { BACKEND_URL } from "@/shared/constants/config";
 export function RoomHeader({
   code,
   input,
+  language = "cpp",
   roomId,
   joined,
   setOutput,
@@ -15,6 +16,7 @@ export function RoomHeader({
 }: {
   code: string;
   input: string;
+  language?: string;
   roomId?: string;
   joined?: boolean;
   setOutput: (v: string) => void;
@@ -34,6 +36,7 @@ export function RoomHeader({
         body: JSON.stringify({
           code,
           input,
+          language,
         }),
       });
 
