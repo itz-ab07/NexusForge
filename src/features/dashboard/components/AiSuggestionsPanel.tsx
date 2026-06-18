@@ -1,5 +1,5 @@
 import { Bot } from "lucide-react";
-import { dashboardAiSuggestions } from "@/features/dashboard/data/dashboard.mock";
+import { DashboardEmptyState } from "@/features/dashboard/components/DashboardEmptyState";
 
 export function AiSuggestionsPanel() {
   return (
@@ -8,14 +8,15 @@ export function AiSuggestionsPanel() {
         <Bot className="h-5 w-5 text-neon-cyan" />
         <h2 className="font-display text-lg font-semibold">AI suggestions</h2>
       </div>
-      <div className="mt-5 space-y-3">
-        {dashboardAiSuggestions.map((s) => (
-          <div key={s.tag} className="rounded-lg glass p-3">
-            <span className={`font-mono text-[10px] tracking-widest ${s.textClass}`}>{s.tag}</span>
-            <p className="mt-1 text-sm leading-snug">{s.text}</p>
-          </div>
-        ))}
-      </div>
+
+      <DashboardEmptyState
+        icon={Bot}
+        title="No suggestions yet"
+        description="Start coding in a live room to receive AI-powered practice recommendations."
+        actionLabel="Create your first room"
+        actionTo="/room"
+        actionSearch={{ id: Math.random().toString(36).substring(2, 10) }}
+      />
     </div>
   );
 }

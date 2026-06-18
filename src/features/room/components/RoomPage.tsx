@@ -8,6 +8,7 @@ import { io } from "socket.io-client";
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/features/auth/context/AuthProvider";
 import { BACKEND_URL } from "@/shared/constants/config";
+import { recordRoomJoin } from "@/features/dashboard/lib/dashboard-storage";
 
 export function RoomPage() {
   const { user } = useAuth();
@@ -27,15 +28,22 @@ export function RoomPage() {
   const socketRef = useRef<any>(null);
   const joinedRef = useRef(false);
   const roomIdRef = useRef("");
+  const languageRef = useRef(language);
   const userRef = useRef(user);
+  const trackedJoinRef = useRef<string | null>(null);
 
   userRef.current = user;
+  languageRef.current = language;
 
   const markJoined = (id: string) => {
     roomIdRef.current = id;
     joinedRef.current = true;
     setRoomId(id);
     setJoined(true);
+  };
+
+  const trackRoomJoin = (id: string) => {
+    recordRoomJoin(id, languageRef.current, userRef.current?.firstName || "You");
   };
 
   const emitJoinRoom = (targetRoomId: string) => {
@@ -110,6 +118,10 @@ export function RoomPage() {
     const urlRoomId = params.get("id");
     if (urlRoomId) {
       markJoined(urlRoomId);
+      if (trackedJoinRef.current !== urlRoomId) {
+        trackRoomJoin(urlRoomId);
+        trackedJoinRef.current = urlRoomId;
+      }
     }
 
     return () => {
@@ -164,6 +176,8 @@ export function RoomPage() {
   const joinRoom = () => {
     if (!roomId) return;
     markJoined(roomId);
+    trackRoomJoin(roomId);
+    trackedJoinRef.current = roomId;
     emitJoinRoom(roomId);
 
     // Update URL query parameter without reloading the page
@@ -268,6 +282,8 @@ export function RoomPage() {
                   onClick={() => {
                     const newId = Math.random().toString(36).substring(2, 10);
                     markJoined(newId);
+                    trackRoomJoin(newId);
+                    trackedJoinRef.current = newId;
                     emitJoinRoom(newId);
                     const newUrl = `${window.location.pathname}?id=${encodeURIComponent(newId)}`;
                     window.history.pushState({ path: newUrl }, "", newUrl);
