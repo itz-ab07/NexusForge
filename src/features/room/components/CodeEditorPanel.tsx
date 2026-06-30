@@ -1,5 +1,5 @@
 import { FileCode } from "lucide-react";
-import Editor from "@monaco-editor/react";
+import { Editor } from "@monaco-editor/react";
 import { useRef, useEffect } from "react";
 
 export function CodeEditorPanel({
@@ -162,7 +162,7 @@ export function CodeEditorPanel({
   const languageTag = language === "python" ? "· Python 3" : "· C++17";
 
   return (
-    <div className="holo-card flex-1 flex flex-col overflow-hidden glow-purple min-h-[350px]">
+    <div className="holo-card flex-1 flex flex-col overflow-hidden glow-purple min-h-87.5">
       <div className="flex items-center justify-between border-b border-border/50 px-4 py-2 bg-surface-editor">
         <div className="flex items-center gap-2">
           <FileCode className="h-3.5 w-3.5 text-neon-cyan" />
