@@ -26,15 +26,19 @@ export function RoomPage() {
   
   const isRemoteChange = useRef(false);
   const socketRef = useRef<any>(null);
+  const localStreamRef = useRef<MediaStream | null> (null);
+  const peersRef = useRef<Map<string, RTCPeerConnection>>(
+    new Map()
+  );
   const joinedRef = useRef(false);
   const roomIdRef = useRef("");
   const languageRef = useRef(language);
   const userRef = useRef(user);
   const trackedJoinRef = useRef<string | null>(null);
-
   userRef.current = user;
   languageRef.current = language;
 
+  
   const markJoined = (id: string) => {
     roomIdRef.current = id;
     joinedRef.current = true;
@@ -51,6 +55,86 @@ export function RoomPage() {
       roomId: targetRoomId,
       user: userRef.current,
     });
+  };
+
+  useEffect(() => {
+    const initMedia = async() => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: false,
+        });
+
+        stream.getAudioTracks().forEach((track) => {
+          track.enabled = true;
+        });
+
+        localStreamRef.current = stream;
+        console.log("microphone connected");
+      } catch(error) {
+        console.error("microphone access denied",error);
+      }
+    };
+    initMedia();
+  }, []);
+
+  const createPeerConnection = (targetId: string) => {
+    const peer = new RTCPeerConnection({
+      iceServers: [
+        {
+          urls: "stun:stun.l.google.com:19302",
+        },
+      ],
+    });
+
+    // Add microphone tracks
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((track) => {
+        console.log(
+          "Adding track:",
+          track.kind,
+          track.enabled,
+          track.readyState
+        );
+
+        peer.addTrack(track, localStreamRef.current!);
+      });
+    }
+
+    peer.onicecandidate = (event) => {
+      if (event.candidate) {
+        socketRef.current.emit("webrtc-signal", {
+          targetId,
+          signal: {
+            type: "ice-candidate",
+            candidate: event.candidate,
+          },
+        });
+      }
+    };
+
+    peer.ontrack = (event) => {
+      console.log("Remote track received");
+      console.log("Track kind:", event.track.kind);
+      console.log("Track enabled:", event.track.enabled);
+      console.log("Track readyState:", event.track.readyState);
+
+      const remoteStream = event.streams[0];
+
+      console.log("Audio tracks:", remoteStream.getAudioTracks());
+
+      const audio = new Audio();
+      audio.srcObject = remoteStream;
+      audio.autoplay = true;
+
+      audio.play()
+        .then(() => console.log("🔊 Audio playing"))
+        .catch((err) => console.error("Play error:", err));
+    };
+
+    peersRef.current.set(targetId, peer);
+
+    return peer;
   };
 
   // Initialize socket connection
@@ -83,15 +167,46 @@ export function RoomPage() {
     };
 
     // Handle user list updates
-    const onRoomUsers = (users: any[]) => {
-      setOnlineUsers(users);
-      setRemoteCursors((prev) => prev.filter((rc) => users.some((u) => u.socketId === rc.socketId)));
+  const onRoomUsers = async (users: any[]) => {
+    console.log("MY SOCKET:", socketRef.current?.id);
+    setOnlineUsers(users);
 
-      const me = users.find((u) => u.socketId === socket.id);
-      if (me) {
-        setMyInfo(me);
-      }
-    };
+    setRemoteCursors((prev) =>
+      prev.filter((rc) =>
+        users.some((u) => u.socketId === rc.socketId)
+      )
+    );
+
+    const me = users.find((u) => u.socketId === socket.id);
+
+    if (me) {
+      setMyInfo(me);
+    }
+
+    // WebRTC
+    for (const user of users) {
+      if (user.socketId === socket.id) continue;
+
+      if (peersRef.current.has(user.socketId)) continue;
+      if (socketRef.current?.id > user.socketId) continue;
+      console.log("Creating peer for:", user.username);
+
+      const peer = createPeerConnection(user.socketId);
+
+      const offer = await peer.createOffer();
+      await peer.setLocalDescription(offer);
+
+      socketRef.current.emit("webrtc-signal", {
+        targetId: user.socketId,
+        signal: {
+          type: "offer",
+          offer,
+        },
+      });
+
+      console.log("Offer sent to", user.username);
+    }
+  };
 
     // Handle cursor synchronization updates
     const onCursorUpdate = ({ socketId, cursor, username, color }: any) => {
@@ -110,6 +225,70 @@ export function RoomPage() {
     socket.on("receive-code", onReceiveCode);
     socket.on("room-init", onRoomInit);
     socket.on("room-users", onRoomUsers);
+    socket.on("webrtc-signal", async ({ senderId, signal }) => {
+      console.log("Received signal:", signal.type, "from", senderId);
+
+      if (signal.type === "offer") {
+        try {
+          let peer = peersRef.current.get(senderId);
+
+          if (!peer) {
+            peer = createPeerConnection(senderId);
+          }
+
+          await peer.setRemoteDescription(
+            new RTCSessionDescription(signal.offer)
+          );
+
+          const answer = await peer.createAnswer();
+          await peer.setLocalDescription(answer);
+
+          socketRef.current.emit("webrtc-signal", {
+            targetId: senderId,
+            signal: {
+              type: "answer",
+              answer,
+            },
+          });
+
+          console.log("✅ Answer sent to", senderId);
+        } catch (err) {
+          console.error("❌ OFFER ERROR:", err);
+        }
+      }
+
+      if (signal.type === "answer") {
+        try {
+          const peer = peersRef.current.get(senderId);
+
+          if (!peer) return;
+
+          await peer.setRemoteDescription(
+            new RTCSessionDescription(signal.answer)
+          );
+
+          console.log("✅ Answer received from", senderId);
+        } catch (err) {
+          console.error("❌ ANSWER ERROR:", err);
+        }
+      }
+
+      if (signal.type === "ice-candidate") {
+        try {
+          const peer = peersRef.current.get(senderId);
+
+          if (!peer) return;
+
+          await peer.addIceCandidate(
+            new RTCIceCandidate(signal.candidate)
+          );
+
+          console.log("✅ ICE added from", senderId);
+        } catch (err) {
+          console.error("❌ ICE ERROR:", err);
+        }
+      }
+    });
     socket.on("cursor-update", onCursorUpdate);
     socket.on("receive-message", onReceiveMessage);
 
@@ -206,6 +385,10 @@ export function RoomPage() {
 
   // Handle local microphone toggle
   const handleMicToggle = (micState: boolean) => {
+    localStreamRef.current?.getAudioTracks().forEach((track) => {
+      track.enabled = micState;
+    });
+
     if (joined && roomId) {
       socketRef.current.emit("mic-toggle", { roomId, mic: micState });
     }
